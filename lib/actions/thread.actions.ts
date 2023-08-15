@@ -11,12 +11,8 @@ interface Params {
   communityId: string | null;
   path: string;
 }
-export async function createThread({
-  text,
-  author,
-  communityId,
-  path,
-}: Params) {
+
+export async function createThread({ text, author, path }: Params) {
   try {
     connectToDB();
     const createdThread = await Thread.create({
@@ -65,7 +61,7 @@ export async function fetchThreadById(id: string) {
   connectToDB();
   try {
     // TODO: Populate Community
-    const thread = await Thread.findById(id)
+    return await Thread.findById(id)
       .populate({
         path: "author",
         model: User,
@@ -91,8 +87,33 @@ export async function fetchThreadById(id: string) {
         ],
       })
       .exec();
-    return thread;
   } catch (error: any) {
     throw new Error(`Error fetching thread: ${error.message}`);
+  }
+}
+
+export async function addCommentToThread(
+  threadId: string,
+  commentText: string,
+  userId: string,
+  path: string,
+) {
+  connectToDB();
+  try {
+    const originalThread = await Thread.findById(threadId);
+    if (!originalThread) {
+      throw new Error("Thread not found");
+    }
+    const commentThread = new Thread({
+      text: commentText,
+      author: userId,
+      parentId: threadId,
+    });
+    const savedCommentThread = await commentThread.save();
+    originalThread.children.push(savedCommentThread._id);
+    await originalThread.save();
+    revalidatePath(path);
+  } catch (error: any) {
+    throw new Error(`Error adding comment to thread: ${error.message}`);
   }
 }
